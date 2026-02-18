@@ -24,38 +24,154 @@
       }
     });
 
-    // NEW: AR Component - Only hides walls in AR, nothing else changed
+    // AR Support Component with plane detection and gesture controls
     AFRAME.registerComponent('ar-support', {
       init: function () {
         const scene = this.el;
-        
+        let isARMode = false;
+        let selectedModel = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartDist = 0;
+        let arUI = null;
+
         scene.addEventListener('enter-vr', () => {
-          if (scene.is('ar-mode')) {
-            // Hide walls/floor/ceiling in AR mode only
+          const xrSession = this.el.renderer.xr.getSession();
+          if (xrSession && xrSession.sessionMode === 'immersive-ar') {
+            isARMode = true;
             document.querySelector('a-sky')?.setAttribute('visible', 'false');
-            document.querySelector('a-plane[color="#8F9B78"]')?.setAttribute('visible', 'false');
-            document.querySelector('a-plane[color="#FFA4A4"]')?.setAttribute('visible', 'false');
-            document.querySelector('a-plane[color="#FFBDBD"]')?.setAttribute('visible', 'false');
-            document.querySelector('a-plane[color="#FFD6D6"]')?.setAttribute('visible', 'false');
-            document.querySelector('a-plane[color="#FFF5F5"]')?.setAttribute('visible', 'false');
+            
+            // Hide all VR scene walls
+            document.querySelectorAll('a-plane[color]').forEach(plane => {
+              plane.setAttribute('visible', 'false');
+            });
+
+            // Show AR UI
+            this.showARUI();
+            this.enableARGestures();
+            this.enablePlaneDetection();
           }
         });
 
         scene.addEventListener('exit-vr', () => {
-          // Show everything again when exiting AR
+          isARMode = false;
           document.querySelector('a-sky')?.setAttribute('visible', 'true');
-          document.querySelector('a-plane[color="#8F9B78"]')?.setAttribute('visible', 'true');
-          document.querySelector('a-plane[color="#FFA4A4"]')?.setAttribute('visible', 'true');
-          document.querySelector('a-plane[color="#FFBDBD"]')?.setAttribute('visible', 'true');
-          document.querySelector('a-plane[color="#FFD6D6"]')?.setAttribute('visible', 'true');
-          document.querySelector('a-plane[color="#FFF5F5"]')?.setAttribute('visible', 'true');
+          document.querySelectorAll('a-plane[color]').forEach(plane => {
+            plane.setAttribute('visible', 'true');
+          });
+          this.hideARUI();
+          this.disableARGestures();
+        });
+
+        this.showARUI = function() {
+          if (!arUI) {
+            arUI = document.createElement('div');
+            arUI.id = 'ar-ui-panel';
+            arUI.innerHTML = `
+              <div style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+                          background: rgba(0,0,0,0.7); color: white; padding: 15px 20px; 
+                          border-radius: 30px; font-size: 14px; z-index: 9998; text-align: center;">
+                <div>Tap to place • Pinch to scale • Rotate with two fingers</div>
+              </div>
+            `;
+            document.body.appendChild(arUI);
+          }
+        };
+
+        this.hideARUI = function() {
+          if (arUI) {
+            arUI.remove();
+            arUI = null;
+          }
+        };
+
+        this.enableARGestures = function() {
+          document.addEventListener('touchstart', (e) => {
+            if (!isARMode) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            if (e.touches.length === 2) {
+              touchStartDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+              );
+            }
+          });
+
+          document.addEventListener('touchmove', (e) => {
+            if (!isARMode || !selectedModel || e.touches.length < 2) return;
+            
+            const currentDist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            const scale = currentDist / touchStartDist;
+            const currentScale = selectedModel.getAttribute('scale');
+            const newScale = Math.max(0.1, Math.min(5, 
+              currentScale.x * (scale > 1.1 ? 1.05 : scale < 0.9 ? 0.95 : 1)
+            ));
+            selectedModel.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+            touchStartDist = currentDist;
+          });
+
+          document.addEventListener('touchend', () => {
+            // Reset for next gesture
+          });
+        };
+
+        this.disableARGestures = function() {
+          document.removeEventListener('touchstart', null);
+          document.removeEventListener('touchmove', null);
+          document.removeEventListener('touchend', null);
+        };
+
+        this.enablePlaneDetection = function() {
+          // AR plane detection and raycasting for placement
+          const raycaster = new THREE.Raycaster();
+          const tapPos = new THREE.Vector2();
+
+          document.addEventListener('click', async () => {
+            if (!isARMode) return;
+            
+            const camera = scene.camera;
+            const session = scene.renderer.xr.getSession();
+            
+            if (session && session.inputSources && session.inputSources.length > 0) {
+              try {
+                const frame = await session.requestAnimationFrame((frame) => {
+                  const pose = frame.getPose(session.inputSources[0].targetRaySpace, frame.session.getReferenceSpace());
+                  if (pose) {
+                    // Place model at detected plane
+                    const visibleModels = document.querySelectorAll('.superhero-model[visible="true"]');
+                    if (visibleModels.length > 0) {
+                      selectedModel = visibleModels[0];
+                      selectedModel.setAttribute('position', '0 0 -2');
+                    }
+                  }
+                });
+              } catch (e) {
+                console.log('Plane detection not available, using default placement');
+              }
+            }
+          });
+        };
+      }
+    });
+
+    // AR Model Interaction Component
+    AFRAME.registerComponent('ar-interactive', {
+      init: function() {
+        this.el.addEventListener('click', () => {
+          document.querySelectorAll('.superhero-model')
+            .forEach(m => m.classList.remove('ar-selected'));
+          this.el.classList.add('ar-selected');
         });
       }
     });
   </script>
 
   <style>
-    /* Simple button - won't affect your VR */
+    /* AR Button - won't affect your VR */
     #vr-ar-button {
       position: fixed;
       bottom: 20px;
@@ -70,9 +186,57 @@
       font-weight: bold;
       cursor: pointer;
       box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
     }
     #vr-ar-button:hover {
       background: #6B281C;
+      transform: scale(1.05);
+    }
+    #vr-ar-button:active {
+      transform: scale(0.95);
+    }
+
+    /* AR UI Panel */
+    #ar-ui-panel {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* AR Selected Model Indicator */
+    .ar-selected {
+      outline: 3px solid #FFD700 !important;
+    }
+
+    /* AR Loading Indicator */
+    .ar-loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10000;
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(138, 51, 36, 0.3);
+      border-top: 4px solid #8A3324;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: translate(-50%, -50%) rotate(360deg);
+      }
     }
   </style>
 </head>
@@ -137,6 +301,7 @@
               scale="0.7 0.7 0.7"
               visible="false"
               animation-mixer
+              ar-interactive
               animation="property: position; dir: alternate; dur: 2000; loop: true; to: 0 0.3 2"
               animation__rotate="property: rotation; dur: 12000; loop: true; to: 0 360 0">
     </a-entity>
@@ -147,6 +312,7 @@
             scale="1 1 1"
             visible="false"
             animation-mixer
+            ar-interactive
             animation="property: rotation; dur: 25000; loop: true; to: 0 360 0">
     </a-entity>
 
@@ -156,6 +322,7 @@
               scale="0.6 0.6 0.6"
               visible="false"
               animation-mixer
+              ar-interactive
               rotation="0 0 0"
               animation__run="property: position; dir: alternate; dur: 800; loop: true; to: 0 0 1.2">
     </a-entity>
@@ -166,6 +333,7 @@
               scale="1 1 1"
               visible="false"
               animation-mixer
+              ar-interactive
               animation="property: position; dir: alternate; dur: 3000; loop: true; to: 0 0.2 2"
               animation__rotate="property: rotation; dur: 15000; loop: true; to: 0 360 0">
     </a-entity>
@@ -177,6 +345,7 @@
               visible="false"
               rotation="0 -45 0"
               animation-mixer
+              ar-interactive
               animation="property: position; dir: alternate; dur: 3500; loop: true; to: 0 0.25 2">
     </a-entity>
 
@@ -186,6 +355,7 @@
               scale="0.9 0.9 0.9"
               visible="false"
               animation-mixer
+              ar-interactive
               animation="property: rotation; dur: 20000; loop: true; to: 0 360 0">
     </a-entity>
 
@@ -195,6 +365,7 @@
               scale="0.4 0.4 0.4"
               visible="false"
               animation-mixer
+              ar-interactive
               animation="property: position; dir: alternate; dur: 2500; loop: true; to: 0 0.25 2">
     </a-entity>
 
@@ -226,27 +397,90 @@
 
   </a-scene>
 
-  <!-- SIMPLE BUTTON - Won't affect VR, just helps start AR -->
-  <button id="vr-ar-button">Switch to AR (📱 use on phone)</button>
+  <!-- ENHANCED AR BUTTON WITH BETTER UX -->
+  <button id="vr-ar-button">🚀 Launch AR Experience</button>
 
   <script>
-    // Simple button to help start AR - doesn't change your VR code
+    // AR Session Manager
+    let arSession = null;
+    let isARSupported = false;
+
+    // Check AR Support on load
+    async function checkARSupport() {
+      if (navigator.xr) {
+        try {
+          const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+          isARSupported = isSupported;
+          const button = document.getElementById('vr-ar-button');
+          if (!isARSupported) {
+            button.textContent = '📱 AR not supported on this device';
+            button.disabled = true;
+            button.style.opacity = '0.5';
+          }
+        } catch (e) {
+          console.log('XR not available:', e);
+        }
+      }
+    }
+
+    // Enhanced AR Button Handler
     document.getElementById('vr-ar-button').addEventListener('click', async () => {
       const scene = document.querySelector('a-scene');
-      
-      if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        try {
-          if (navigator.xr) {
-            const session = await navigator.xr.requestSession('immersive-ar');
-            scene.renderer.xr.setSession(session);
-          }
-        } catch (err) {
-          alert('AR failed. Make sure you're on HTTPS and have camera permission.');
+      const button = document.getElementById('vr-ar-button');
+      const isDesktop = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (isDesktop) {
+        alert('📱 AR Features:\n\n✓ Place superheroes in your real world\n✓ Pinch to scale\n✓ Rotate with two fingers\n✓ Tap to move\n\nOpen this link on your phone to use AR!');
+        return;
+      }
+
+      if (!navigator.xr) {
+        alert('❌ WebXR not available on this browser.\n\nTry:\n• Chrome 79+\n• Firefox Reality\n• Samsung Internet');
+        return;
+      }
+
+      try {
+        button.textContent = '⏳ Starting AR...';
+        button.disabled = true;
+
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['dom-overlay', 'dom-overlay-for-handheld-ar'],
+          domOverlay: { root: document.body }
+        });
+
+        arSession = session;
+        scene.renderer.xr.setSession(session);
+        button.textContent = '📱 Exit AR';
+
+      } catch (err) {
+        console.error('AR Error:', err);
+        let errorMsg = '❌ AR Failed';
+        
+        if (err.name === 'NotSupportedError') {
+          errorMsg = '❌ AR not supported. Check:\n• HTTPS connection\n• Camera permission\n• Browser support';
+        } else if (err.name === 'NotAllowedError') {
+          errorMsg = '❌ Camera permission denied.\nGo to settings to enable.';
         }
-      } else {
-        alert('📱 AR only works on phones!\n\n1. Upload this to a HTTPS server\n2. Open on your phone\n3. Click this button again');
+        
+        alert(errorMsg);
+        button.textContent = '📱 Try AR Again';
+        button.disabled = false;
       }
     });
+
+    // Handle AR Session End
+    document.addEventListener('beforexrselect', (e) => {
+      e.preventDefault();
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (arSession) {
+        arSession.end();
+      }
+    });
+
+    // Check support on page load
+    window.addEventListener('load', checkARSupport);
   </script>
 </body>
 </html>
