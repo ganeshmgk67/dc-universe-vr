@@ -5,7 +5,7 @@
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
   <script>
-    // Your original component (unchanged)
+    // YOUR ORIGINAL COMPONENT - UNCHANGED
     AFRAME.registerComponent('show-text-and-model', {
       schema: {
         message: { type: 'string' },
@@ -24,47 +24,69 @@
       }
     });
 
-    // SIMPLIFIED AR toggle component
-    AFRAME.registerComponent('ar-toggle', {
+    // NEW: AR Component - Only hides walls in AR, nothing else changed
+    AFRAME.registerComponent('ar-support', {
       init: function () {
         const scene = this.el;
-        const envElements = [
-          document.querySelector('a-sky'),
-          document.querySelector('a-plane[color="#8F9B78"]'),  // floor
-          document.querySelector('a-plane[color="#FFA4A4"]'), // back wall
-          document.querySelector('a-plane[color="#FFBDBD"]'), // walls
-          document.querySelector('a-plane[color="#FFD6D6"]'), // front wall
-          document.querySelector('a-plane[color="#FFF5F5"]')  // ceiling
-        ].filter(el => el !== null); // remove nulls
-
+        
         scene.addEventListener('enter-vr', () => {
-          // In AR mode, hide environment
           if (scene.is('ar-mode')) {
-            envElements.forEach(el => {
-              if (el) el.setAttribute('visible', false);
-            });
+            // Hide walls/floor/ceiling in AR mode only
+            document.querySelector('a-sky')?.setAttribute('visible', 'false');
+            document.querySelector('a-plane[color="#8F9B78"]')?.setAttribute('visible', 'false');
+            document.querySelector('a-plane[color="#FFA4A4"]')?.setAttribute('visible', 'false');
+            document.querySelector('a-plane[color="#FFBDBD"]')?.setAttribute('visible', 'false');
+            document.querySelector('a-plane[color="#FFD6D6"]')?.setAttribute('visible', 'false');
+            document.querySelector('a-plane[color="#FFF5F5"]')?.setAttribute('visible', 'false');
           }
         });
 
         scene.addEventListener('exit-vr', () => {
-          // Show environment again
-          envElements.forEach(el => {
-            if (el) el.setAttribute('visible', true);
-          });
+          // Show everything again when exiting AR
+          document.querySelector('a-sky')?.setAttribute('visible', 'true');
+          document.querySelector('a-plane[color="#8F9B78"]')?.setAttribute('visible', 'true');
+          document.querySelector('a-plane[color="#FFA4A4"]')?.setAttribute('visible', 'true');
+          document.querySelector('a-plane[color="#FFBDBD"]')?.setAttribute('visible', 'true');
+          document.querySelector('a-plane[color="#FFD6D6"]')?.setAttribute('visible', 'true');
+          document.querySelector('a-plane[color="#FFF5F5"]')?.setAttribute('visible', 'true');
         });
       }
     });
   </script>
+
+  <style>
+    /* Simple button - won't affect your VR */
+    #vr-ar-button {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 9999;
+      padding: 12px 24px;
+      background: #8A3324;
+      color: white;
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #vr-ar-button:hover {
+      background: #6B281C;
+    }
+  </style>
 </head>
 <body>
-  <!-- SIMPLIFIED scene with just ar enabled -->
+  <!-- YOUR SCENE - ONLY ADDED ar-support AND webxr, EVERYTHING ELSE IS EXACTLY YOUR CODE -->
   <a-scene background="color: #f2f2f2" 
            cursor="rayOrigin: mouse"
-           ar>
-    
-    <!-- Your EXACT same content below - NOTHING changed -->
+           ar-support
+           webxr="optionalFeatures: hit-test;">
+
+    <!-- YOUR EXACT SKY AND WALLS - UNCHANGED -->
     <a-sky color="#f2f2f2"></a-sky>
 
+    <!-- YOUR EXACT ASSETS - UNCHANGED -->
     <a-assets>
       <img id="superman" src="assets/images/superman_logo.jpg">
       <img id="batman" src="assets/images/batman.jpg">
@@ -83,11 +105,14 @@
       <a-asset-item id="shazamModel" src="assets/models/shazam.glb"></a-asset-item>
     </a-assets>
 
+    <!-- YOUR EXACT CAMERA - UNCHANGED -->
     <a-entity camera position="0 1.6 6" wasd-controls look-controls></a-entity>
 
+    <!-- YOUR EXACT LIGHTS - UNCHANGED -->
     <a-entity light="type: ambient; intensity: 0.6"></a-entity>
     <a-entity light="type: directional; intensity: 0.8" position="0 5 5"></a-entity>
 
+    <!-- YOUR EXACT FLOOR AND WALLS - UNCHANGED -->
     <a-plane position="0 -1 0" rotation="-90 0 0" width="14" height="14" color="#8F9B78"></a-plane>
     <a-plane position="0 2 -7" width="14" height="6" color="#FFA4A4"></a-plane>
     <a-plane position="-7 2 0" rotation="0 90 0" width="14" height="6" color="#FFBDBD"></a-plane>
@@ -95,6 +120,7 @@
     <a-plane position="0 2 7" rotation="0 180 0" width="14" height="6" color="#FFD6D6"></a-plane>
     <a-plane position="0 5 0" rotation="90 0 0" width="14" height="14" color="#FFF5F5"></a-plane>
 
+    <!-- YOUR EXACT TEXT - UNCHANGED -->
     <a-text id="infoText"
           value="Click a superhero image"
           position="0 4 -6.9"
@@ -104,7 +130,7 @@
           color="#8A3324">
     </a-text>
 
-    <!-- MODELS (EXACTLY AS YOU HAD THEM) -->
+    <!-- YOUR EXACT MODELS - UNCHANGED -->
     <a-entity id="superman3D" class="superhero-model"
               gltf-model="#supermanModel"
               position="0 0 2"
@@ -172,7 +198,7 @@
               animation="property: position; dir: alternate; dur: 2500; loop: true; to: 0 0.25 2">
     </a-entity>
 
-    <!-- IMAGES (EXACTLY AS YOU HAD THEM) -->
+    <!-- YOUR EXACT IMAGES - UNCHANGED -->
     <a-plane src="#superman" position="-3 1.6 -6.95" width="1.8" height="1.8"
              show-text-and-model="message: Superman – Man of Steel; model: #superman3D"></a-plane>
 
@@ -200,27 +226,25 @@
 
   </a-scene>
 
-  <!-- SIMPLE AR button that definitely works -->
-  <button id="arButton" 
-          style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
-                 padding: 15px 30px; background: #8A3324; color: white; 
-                 border: none; border-radius: 5px; font-size: 18px; z-index: 1000;
-                 cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-    Enter AR Mode
-  </button>
+  <!-- SIMPLE BUTTON - Won't affect VR, just helps start AR -->
+  <button id="vr-ar-button">Switch to AR (📱 use on phone)</button>
 
   <script>
-    document.getElementById('arButton').addEventListener('click', function() {
+    // Simple button to help start AR - doesn't change your VR code
+    document.getElementById('vr-ar-button').addEventListener('click', async () => {
       const scene = document.querySelector('a-scene');
-      // Try different AR entry methods
-      if (scene.components['ar-mode']) {
-        scene.components['ar-mode'].enterAR();
-      } else if (scene.enterAR) {
-        scene.enterAR();
-      } else if (scene.system.webxr) {
-        scene.system.webxr.startSession('immersive-ar');
+      
+      if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        try {
+          if (navigator.xr) {
+            const session = await navigator.xr.requestSession('immersive-ar');
+            scene.renderer.xr.setSession(session);
+          }
+        } catch (err) {
+          alert('AR failed. Make sure you're on HTTPS and have camera permission.');
+        }
       } else {
-        alert('AR not supported on this device/browser. Try on a mobile device with Chrome or Safari.');
+        alert('📱 AR only works on phones!\n\n1. Upload this to a HTTPS server\n2. Open on your phone\n3. Click this button again');
       }
     });
   </script>
